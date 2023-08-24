@@ -52,3 +52,69 @@ from (
 where top_salesman <= 3" (employee_name,sale_month,sale_amount,month_revenue,month_percent) VALUES
 	 ('Michel DeFrance',12.0,906800990,7708189847,11.8),
 	 ('Albert Ringer',12.0,760147928,7708189847,9.9);
+
+/*Первый отчет о десятке лучших продавцов. Таблица состоит из трех колонок - данных о продавце, 
+суммарной выручке с проданных товаров и количестве проведенных сделок, и отсортирована по убыванию выручки:
+name — имя и фамилия продавца
+operations - количество проведенных сделок
+income — суммарная выручка продавца за все время*/
+
+select 
+	concat(e.first_name, ' ', e.last_name) as name,
+	count(s.sales_id) as operations,
+	round(sum(p.price*s.quantity),0) as income
+from employees e
+inner join sales s on s.sales_person_id = e.employee_id 
+inner join products p using(product_id)
+group by concat(e.first_name, ' ', e.last_name)
+order by sum(p.price*s.quantity) desc 
+limit 10
+
+/*Второй отчет содержит информацию о продавцах, чья средняя выручка за сделку меньше средней выручки за сделку по всем продавцам. 
+Таблица отсортирована по выручке по возрастанию.
+name — имя и фамилия продавца
+average_income — средняя выручка продавца за сделку с округлением до целого*/
+
+with avg_income as (
+	select 
+	round(avg(p.price*s.quantity),0) as avg_income
+	from sales s 
+	inner join products p using(product_id)
+)
+select 
+	concat(e.first_name, ' ', e.last_name) as name,
+	round(avg(p.price*s.quantity),0) as income
+from employees e
+inner join sales s on s.sales_person_id = e.employee_id 
+inner join products p using(product_id)
+group by concat(e.first_name, ' ', e.last_name)
+having round(avg(p.price*s.quantity),0) < (
+	select *
+	from avg_income
+	)
+order by income
+
+/*Третий отчет содержит информацию о выручке по дням недели. Каждая запись содержит имя и фамилию продавца, день недели и суммарную выручку. 
+Отсортируйте данные по порядковому номеру дня недели и name
+name — имя и фамилия продавца
+weekday — название дня недели на английском языке
+income — суммарная выручка продавца в определенный день недели, округленная до целого числа*/
+
+with cte_tab as (
+	select 
+		concat(e.first_name, ' ', e.last_name) as name,
+		extract(ISODOW from s.sale_date) as dayweek,
+		to_char(s.sale_date, 'Day') as weekday,
+		(p.price*s.quantity) as income
+	from employees e
+	inner join sales s on s.sales_person_id = e.employee_id 
+	inner join products p using(product_id)
+	order by weekday
+)
+select
+	name,
+	weekday,
+	round(sum(income),0) as income
+from cte_tab
+group by weekday, dayweek, name 
+order by dayweek, name
