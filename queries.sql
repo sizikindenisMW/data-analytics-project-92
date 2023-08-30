@@ -118,3 +118,77 @@ select
 from cte_tab
 group by weekday, dayweek, name 
 order by dayweek, name
+
+-- Задания с шага №6
+-- Задание №1
+/*Само задание: количество покупателей в разных возрастных группах: 16-25, 26-40 и 40+. 
+Итоговая таблица должна быть отсортирована по возрастным группам и содержать следующие поля:
+age_category - возрастная группа
+count - количество человек в группе*/
+with cte_tab as (
+select 
+	age,
+	case 
+		when age between 16 and 25 then '16-25'
+		when age between 26 and 40 then '26-40'
+		when age > 40 then '40+'
+	end as age_category
+from customers c
+)
+select
+	age_category,
+	count(age) as count
+from cte_tab
+group by age_category
+order by age_category
+
+-- Задание №2
+/*Во втором отчете предоставьте данные по количеству уникальных покупателей и выручке, которую они принесли. 
+Сгруппируйте данные по дате, которая представлена в числовом виде ГОД-МЕСЯЦ. 
+Итоговая таблица должна быть отсортирована по дате по возрастанию и содержать следующие поля:
+date - дата в указанном формате
+total_customers - количество покупателей
+income - принесенная выручка*/
+select 
+	to_char(
+		sale_date,
+		'YYYY-MM'
+	) date,
+	count(distinct customer_id) as total_customers,
+	round(sum(quantity*price),0) as income
+from sales s 
+inner join products p using(product_id)
+group by date
+order by date 
+
+-- Задание №3
+/*Третий отчет следует составить о покупателях, первая покупка которых была в ходе проведения акций (акционные товары отпускали со стоимостью равной 0). 
+Итоговая таблица должна быть отсортирована по id покупателя. Таблица состоит из следующих полей:
+customer - имя и фамилия покупателя
+sale_date - дата покупки
+seller - имя и фамилия продавца*/
+--создаю CTE, с основными атрибутами, которые понадобятся для вывода целевого результата
+--оконную функцию использую для окна покупателя, чтобы определить дату его первой покупки 
+with cte_tab as (
+select 
+	c.customer_id,
+	concat(c.first_name,' ',c.last_name) as customer,
+	p.price,
+	s.sale_date,
+	concat(e.first_name,' ',e.last_name) as seller,
+	first_value(sale_date) over (partition by concat(c.first_name,' ',c.last_name) order by sale_date) as first_buy
+from customers c
+inner join sales s using(customer_id)
+inner join products p using(product_id)
+inner join employees e on e.employee_id = s.sales_person_id
+)
+--в запросе к CTE уже вывожу самую раннюю дату покупки только для тех операций, в которых цена товара была равна 0
+--в группировку добавляю customer_id, чтобы выполнить сортировку по этому полю
+select 
+	customer,
+	min(first_buy) as sale_date,
+	seller
+from cte_tab
+where price = 0
+group by customer, seller, customer_id
+order by customer_id
