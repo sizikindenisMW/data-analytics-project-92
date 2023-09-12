@@ -169,26 +169,24 @@ sale_date - дата покупки
 seller - имя и фамилия продавца*/
 --создаю CTE, с основными атрибутами, которые понадобятся для вывода целевого результата
 --оконную функцию использую для окна покупателя, чтобы определить дату его первой покупки 
+
 with cte_tab as (
 select 
 	c.customer_id,
 	concat(c.first_name,' ',c.last_name) as customer,
 	p.price,
-	s.sale_date,
+	s.sale_date, 
 	concat(e.first_name,' ',e.last_name) as seller,
-	first_value(sale_date) over (partition by concat(c.first_name,' ',c.last_name) order by sale_date) as first_buy
+	dense_rank() over (partition by concat(c.first_name,' ',c.last_name) order by s.sale_date) as rn
 from customers c
 inner join sales s using(customer_id)
 inner join products p using(product_id)
 inner join employees e on e.employee_id = s.sales_person_id
+where price = 0
 )
---в запросе к CTE уже вывожу самую раннюю дату покупки только для тех операций, в которых цена товара была равна 0
---в группировку добавляю customer_id, чтобы выполнить сортировку по этому полю
 select 
-	customer,
-	min(first_buy) as sale_date,
+	distinct customer,
+	sale_date,
 	seller
 from cte_tab
-where price = 0
-group by customer, seller, customer_id
-order by customer_id
+where rn = 1
